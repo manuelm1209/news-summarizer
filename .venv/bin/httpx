@@ -1,4 +1,4 @@
-#!/Users/manuelmontoya/Documents/Projects/github/assistants/youtube-tutorial/news-summarizer/.venv/bin/python
+#!/Users/manuelmontoya/Documents/Projects/github/assistants/youtube-tutorial/news-summarizer-AI/.venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys
