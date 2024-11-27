@@ -45,14 +45,14 @@ def get_news(topic):
                 description = article["description"]
                 url = article["url"]
                 content = article["content"]
-                title_description = f"""
+                article_content = f"""
                     Title: {title},
                     Author: {author},
                     Source: {source_name},
                     Description: {description},
                     URL: {url}
                 """
-                final_news.append(title_description)
+                final_news.append(article_content)
                 
             return final_news
         else:
@@ -66,7 +66,7 @@ class AssistantManager:
     # assistant_id = None
     assistant_id = "asst_Sysu0w0SC5I9OKKrGFCMgEVu"
     
-    def __init__(self, model: str = model) -> None:
+    def __init__(self, model: str = model):
         self.client = client
         self.model = model
         self.assistant = None
@@ -127,9 +127,13 @@ class AssistantManager:
             role = last_message.role
             response = last_message.content[0].text.value
             summary.append(response)
+            # print(f"\nMESSAGE::::>>> {messages}")
+            st.write("**Message:**")              
+            st.json(messages.model_dump_json(indent=4), expanded=False)
+            st.divider()
             
             self.summary = "\n".join(summary)
-            print(f"\nSUMMARY-----> {role.capitalize()}: ==> {response}")
+            # print(f"\nSUMMARY-----> {role.capitalize()}: ==> {response}")
 
             # for msg in messages:
             #     role = msg.role
@@ -148,7 +152,7 @@ class AssistantManager:
             
             if func_name == "get_news":
                 output = get_news(topic = arguments["topic"])
-                print(f"STUFFFFF;;;;; {output}")
+                print(f"\nSTUFFFFF:::>>> {output}")
                 final_str = ""
                 for item in output:
                     final_str += "".join(item)
@@ -158,7 +162,7 @@ class AssistantManager:
             else:
                 raise ValueError(f"Unknown function : {func_name}")
                 
-        print("Submiting outputs back to the Assistant...")
+        print(f"\nSubmiting outputs back to the Assistant:::>>> {tool_outputs}")
         self.client.beta.threads.runs.submit_tool_outputs(
             thread_id = self.thread.id,
             run_id = self.run.id,
@@ -177,7 +181,7 @@ class AssistantManager:
                     thread_id = self.thread.id,
                     run_id = self.run.id
                 )
-                print(f"RUN STATUS:: {run_status.model_dump_json(indent=4)}")
+                # print(f"\nRUN STATUS:: {run_status.model_dump_json(indent=4)}")
                 run_status_data = json.loads(run_status.model_dump_json())
                 st.write(f"**Status:** {run_status_data["status"]}")
                 st.json(run_status.model_dump_json(indent=4), expanded=False)
@@ -198,7 +202,7 @@ class AssistantManager:
             thread_id = self.thread.id,
             run_id = self.run.id
         )
-        print(f"RUN-STEPS::: {run_steps}")
+        print(f"\nRUN STEPS::: {run_steps}")
         return run_steps.data
          
 def main():
@@ -244,7 +248,7 @@ def main():
             
             manager.add_message_to_thread(
                 role="user",
-                content=f"summarize the news on this topic {instructions}?"
+                content=f"summarize the news on this topic: {instructions}?"
             )
             manager.run_assistant(instructions="Summarize the news")
             
