@@ -63,13 +63,14 @@ def get_news(topic):
     
 class AssistantManager:
     thread_id = None
-    assistant_id = None
+    # assistant_id = None
+    assistant_id = "asst_Sysu0w0SC5I9OKKrGFCMgEVu"
     
     def __init__(self, model: str = model) -> None:
         self.client = client
         self.model = model
-        self.assistant = (None,)
-        self.thread = (None,)
+        self.assistant = None
+        self.thread = None
         self.run = None
         self.summary = None
         
@@ -79,12 +80,12 @@ class AssistantManager:
                 assistant_id = AssistantManager.assistant_id
             )
         if AssistantManager.thread_id:
-            self.thread = self.client.beta.threads.retreave(
+            self.thread = self.client.beta.threads.retrieve(
                 thread_id = AssistantManager.thread_id
             )
     def create_assistant(self, name, instructions, tools):
         if not self.assistant:
-            assistant_obj = self.client.beta.assistant.create(
+            assistant_obj = self.client.beta.assistants.create(
                 name = name,
                 instructions = instructions,
                 tools = tools,
@@ -96,7 +97,7 @@ class AssistantManager:
             
     def create_thread(self):
         if not self.thread:
-            thread_obj = self.client.beta.thread.create()
+            thread_obj = self.client.beta.threads.create()
             AssistantManager.thread_id = thread_obj.id
             self.thread = thread_obj
             print(f"ThreadID::: {self.thread.id}")
@@ -118,7 +119,7 @@ class AssistantManager:
             
     def process_message(self):
         if self.thread:
-            messages = self.cliet.beta.threads.messages.list(thread_id = self.thread.id)
+            messages = self.client.beta.threads.messages.list(thread_id = self.thread.id)
             summary = []
             
             last_message = messages.data[0]
@@ -142,6 +143,7 @@ class AssistantManager:
         for action in required_actions["tool_calls"]:
             func_name = action["function"]["name"]
             arguments = json.loads(action["function"]["arguments"])
+            print(f"{arguments}")
             
             if func_name == "get_news":
                 output = get_news(topic = arguments["topic"])
@@ -155,18 +157,18 @@ class AssistantManager:
             else:
                 raise ValueError(f"Unknown function : {func_name}")
                 
-                print("Submiting outputs back to the Assistant...")
-                self.client.beta.threads.runs.submit_tool_outputs(
-                    thread_id = self.thread.id,
-                    run_id = self.run.id,
-                    tool_outputs = tool_outputs
-                    )
+        print("Submiting outputs back to the Assistant...")
+        self.client.beta.threads.runs.submit_tool_outputs(
+            thread_id = self.thread.id,
+            run_id = self.run.id,
+            tool_outputs = tool_outputs
+            )
 
     # for streamlit
     def get_summary(self):
         return self.summary
                 
-    def wait_for_completed(self):
+    def wait_for_completion(self):
         if self.thread and self.run:
             while True:
                 time.sleep(5)
@@ -175,23 +177,28 @@ class AssistantManager:
                     run_id = self.run.id
                 )
                 print(f"RUN STATUS:: {run_status.model_dump_json(indent=4)}")
+                run_status_data = json.loads(run_status.model_dump_json())
+                st.write(f"**Status:** {run_status_data["status"]}")
+                st.json(run_status.model_dump_json(indent=4), expanded=False)
+                st.divider()
                 
                 if run_status.status == "completed":
-                    self.process_message
+                    self.process_message()
                     break
                 elif run_status.status == "requires_action":
                     print("FUNCTION CALLING NOW...")
                     self.call_required_functions(
-                        required_actions = run_status.required_action.submit_tool_outputs.mode_dump()
+                        required_actions = run_status.required_action.submit_tool_outputs.model_dump()
                     )
                 
     # Run the steps
     def run_steps(self):
         run_steps = self.client.beta.threads.runs.steps.list(
-            thread_id = self.thread.id
+            thread_id = self.thread.id,
             run_id = self.run.id
         )
         print(f"RUN-STEPS::: {run_steps}")
+        return run_steps.data
          
 def main():
     # news = get_news("bitcoin")
@@ -201,8 +208,56 @@ def main():
     # Streamlit interface
     st.title("News Summarizer")
     
-    #TODO ----- continue HERE -------
-    
+    with st.form(key="user_input_form"):
+        instructions = st.text_input("Enter topic: ")
+        submit_button = st.form_submit_button(label="Run Assistant")
+        st.divider()
+        
+        if submit_button:
+            manager.create_assistant(
+                name="News Summarizer",
+                instructions="You are a personal article summarizer assistant who knows how to take a list of articles, title, and description and then write a short summary of all the news articles.",
+                tools=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "get_news",
+                            "description": "Get the list of articles/news for the given topic",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "topic": {
+                                        "type": "string",
+                                        "description": "The topic for the news, e.g. bitcoin",
+                                    }
+                                },
+                                "required": ["topic"],
+                            },
+                        },
+                    }
+                ]
+            )
+            manager.create_thread()
             
+            # Add the message and run the assistant
+            
+            manager.add_message_to_thread(
+                role="user",
+                content=f"summarize the news on this topic {instructions}?"
+            )
+            manager.run_assistant(instructions="Summarize the news")
+            
+            # Wait for completion and process message
+            manager.wait_for_completion()
+            
+            summary = manager.get_summary()
+            
+            st.write(summary)
+            
+            st.divider()
+            st.markdown("#### Run Steps:")
+            st.code(manager.run_steps(), line_numbers=True)
+            
+      
 if __name__ == "__main__":
     main()
