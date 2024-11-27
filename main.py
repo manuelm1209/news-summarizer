@@ -18,6 +18,16 @@ news_api_key = os.environ.get("NEWS_API_KEY")
 client = openai.OpenAI()
 model = "gpt-4o-mini"
 
+status_info = []
+
+def serialize(obj):
+                if hasattr(obj, "__dict__"):
+                    return obj.__dict__
+                elif isinstance(obj, list):
+                    return [serialize(item) for item in obj]
+                else:
+                    return obj
+
 def get_news(topic):
     url = (
         f"https://newsapi.org/v2/everything?q={topic}&apiKey={news_api_key}&pageSize=5"
@@ -128,9 +138,8 @@ class AssistantManager:
             response = last_message.content[0].text.value
             summary.append(response)
             # print(f"\nMESSAGE::::>>> {messages}")
-            st.write("**Message:**")              
-            st.json(messages.model_dump_json(indent=4), expanded=False)
-            st.divider()
+            message_expander = st.expander("**Message**")             
+            message_expander.json(messages.model_dump_json(indent=4), expanded=False)
             
             self.summary = "\n".join(summary)
             # print(f"\nSUMMARY-----> {role.capitalize()}: ==> {response}")
@@ -183,9 +192,11 @@ class AssistantManager:
                 )
                 # print(f"\nRUN STATUS:: {run_status.model_dump_json(indent=4)}")
                 run_status_data = json.loads(run_status.model_dump_json())
-                st.write(f"**Status:** {run_status_data["status"]}")
-                st.json(run_status.model_dump_json(indent=4), expanded=False)
-                st.divider()
+                # Expander Test
+                status_info.append({
+                    "status": run_status_data["status"],
+                    "details": run_status.model_dump_json(indent=4)
+                    })
                 
                 if run_status.status == "completed":
                     self.process_message()
@@ -257,11 +268,23 @@ def main():
             
             summary = manager.get_summary()
             
+            # Expander Test
+            status_expander = st.expander("**Status**")
+            for item in status_info:
+                status_expander.write(f"{item["status"]}")
+                status_expander.json(item["details"], expanded=False)
+                status_expander.divider()
+            st.divider()
+                 
+            
             st.write(summary)
             
             st.divider()
-            st.markdown("#### Run Steps:")
-            st.code(manager.run_steps(), line_numbers=True)
+            run_steps_expander = st.expander("**Run Steps**")
+            steps = manager.run_steps()
+            run_steps_expander.json(serialize(steps))
+            
+            
             
       
 if __name__ == "__main__":
