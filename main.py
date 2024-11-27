@@ -114,6 +114,7 @@ class AssistantManager:
             self.run = self.client.beta.threads.runs.create(
                 thread_id = self.thread.id,
                 assistant_id = self.assistant.id,
+                # The following instruction will override the Assistant instructions.
                 instructions = instructions
             )
             
